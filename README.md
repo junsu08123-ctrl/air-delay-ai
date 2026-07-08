@@ -1,2 +1,2 @@
 # air-delay-ai
-ㄴㅁㄹㄴㅇ
+junsu
