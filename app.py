@@ -1,32 +1,109 @@
-import gradio as gr
+import streamlit as st
 import pandas as pd
 import pickle
 
 
+# -------------------------
 # 모델 불러오기
+# -------------------------
 
-model = pickle.load(open("model.pkl","rb"))
-scaler = pickle.load(open("scaler.pkl","rb"))
+model = pickle.load(open("model.pkl", "rb"))
+scaler = pickle.load(open("scaler.pkl", "rb"))
 
-le_airline = pickle.load(open("le_airline.pkl","rb"))
-le_origin = pickle.load(open("le_origin.pkl","rb"))
-le_dest = pickle.load(open("le_dest.pkl","rb"))
+le_airline = pickle.load(open("le_airline.pkl", "rb"))
+le_origin = pickle.load(open("le_origin.pkl", "rb"))
+le_dest = pickle.load(open("le_dest.pkl", "rb"))
 
-features = pickle.load(open("features.pkl","rb"))
-
-
-accuracy = 0.93
+features = pickle.load(open("features.pkl", "rb"))
 
 
-def predict_delay(
-    airline,
-    origin,
-    dest,
-    dep_hour,
-    month,
-    dayofweek,
-    distance
-):
+# 정확도
+accuracy = 0.9322
+
+
+# -------------------------
+# 화면 디자인
+# -------------------------
+
+st.set_page_config(
+    page_title="항공기 지연 예측 AI",
+    page_icon="✈️"
+)
+
+
+st.title("✈️ AI 항공기 지연 예측 시스템")
+
+st.write(
+    "머신러닝(Logistic Regression)을 활용하여 "
+    "항공기 지연 가능성을 예측합니다."
+)
+
+
+st.divider()
+
+
+# -------------------------
+# 입력
+# -------------------------
+
+airline = st.selectbox(
+    "✈️ 항공사",
+    le_airline.classes_
+)
+
+
+origin = st.selectbox(
+    "🛫 출발 공항",
+    le_origin.classes_
+)
+
+
+dest = st.selectbox(
+    "🛬 도착 공항",
+    le_dest.classes_
+)
+
+
+dep_hour = st.slider(
+    "출발 시간",
+    0,
+    23,
+    12
+)
+
+
+month = st.selectbox(
+    "월",
+    list(range(1,13))
+)
+
+
+dayofweek = st.selectbox(
+    "요일",
+    [
+        ("월요일",0),
+        ("화요일",1),
+        ("수요일",2),
+        ("목요일",3),
+        ("금요일",4),
+        ("토요일",5),
+        ("일요일",6)
+    ],
+    format_func=lambda x:x[0]
+)
+
+
+distance = st.number_input(
+    "비행 거리(mile)",
+    value=500
+)
+
+
+# -------------------------
+# 예측
+# -------------------------
+
+if st.button("🚀 지연 예측하기"):
 
     airline_code = le_airline.transform([airline])[0]
     origin_code = le_origin.transform([origin])[0]
@@ -40,115 +117,51 @@ def predict_delay(
             dest_code,
             dep_hour,
             month,
-            dayofweek,
+            dayofweek[1],
             distance
         ]],
         columns=features
     )
 
 
-    data = scaler.transform(data)
+    data_scaled = scaler.transform(data)
 
 
-    pred = model.predict(data)[0]
-    prob = model.predict_proba(data)[0][1]
+    pred = model.predict(data_scaled)[0]
+    prob = model.predict_proba(data_scaled)[0][1]
+
+
+    st.divider()
 
 
     if pred == 1:
-        result="🔴 지연 예상"
+
+        st.error("🔴 지연 예상")
+
     else:
-        result="🟢 정시 예상"
+
+        st.success("🟢 정시 예상")
 
 
-    return f"""
-# ✈️ 항공기 지연 예측 결과
-
-## {result}
-
-### 지연 확률
-## {prob*100:.2f}%
+    st.metric(
+        "지연 확률",
+        f"{prob*100:.2f}%"
+    )
 
 
----
+    st.write("### 📊 모델 정보")
 
-### 입력 정보
-
-항공사 : {airline}
-
-출발공항 : {origin}
-
-도착공항 : {dest}
-
-출발시간 : {dep_hour}시
-
-월 : {month}
-
-요일 : {dayofweek}
-
-거리 : {distance} mile
+    st.write(
+        f"테스트 정확도 : {accuracy*100:.2f}%"
+    )
 
 
----
+    st.info(
+        """
+        사용 알고리즘:
+        Logistic Regression
 
-### 모델 정확도
-
-{accuracy*100:.2f}%
-
-"""
-
-
-demo = gr.Interface(
-
-    fn=predict_delay,
-
-    inputs=[
-
-        gr.Dropdown(
-            choices=list(le_airline.classes_),
-            label="항공사"
-        ),
-
-        gr.Dropdown(
-            choices=list(le_origin.classes_),
-            label="출발 공항"
-        ),
-
-        gr.Dropdown(
-            choices=list(le_dest.classes_),
-            label="도착 공항"
-        ),
-
-        gr.Slider(
-            0,23,
-            value=12,
-            label="출발 시간"
-        ),
-
-        gr.Dropdown(
-            list(range(1,13)),
-            label="월"
-        ),
-
-        gr.Slider(
-            0,6,
-            value=0,
-            label="요일"
-        ),
-
-        gr.Number(
-            value=500,
-            label="거리(mile)"
-        )
-
-    ],
-
-    outputs="markdown",
-
-    title="✈️ AI 항공기 지연 예측 시스템",
-
-    description="Machine Learning 기반 항공기 지연 예측 서비스"
-
-)
-
-
-demo.launch()
+        개발 환경:
+        Python + Scikit-learn + Streamlit
+        """
+    )
